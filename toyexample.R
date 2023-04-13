@@ -96,21 +96,29 @@ Phi_hat <- function(a, Trials){
   ga_fit <- glm(as.formula(paste0("Y~", covariates_outcome)), data=Trials_arm, family="binomial")
   ga <- sapply(predict(ga_fit, newdata=Whole), expit)
 
+  ### ML ga prediction
+  ga_fit_rf <- randomForest(as.formula(paste0("Y~", covariates_outcome)), data=Trials_arm, mtry=5)
+  ga_rf <- predict(ga_fit_rf, newdata=Whole, type="response")
+
   ### compute ea1
   ea1_fit <- glm(as.formula(paste0("trt~", covariates)), data=Trials, family="binomial")
+  ea1_fit_rf <- randomForest(as.formula(paste0("trt~", covariates)), data=Trials, mtry=5)
   ea1 <- sapply(predict(ea1_fit, Whole), expit)  
+  ea1_rf <- predict(ea1_fit_rf, newdata=Whole, type="response")
   ea0 <- 1-ea1
+  ea0_rf <- 1-ea1_rf
 
   if(a==1){
     wa <- (1-hat_p)/hat_p*ea1
-    wa_rf <- (1-hat_p_rf)/hat_p_rf*ea1
+    wa_rf <- (1-hat_p_rf)/hat_p_rf*ea1_rf
   }else{
     wa <- (1-hat_p)/hat_p*ea0
-    wa_rf <- (1-hat_p_rf)/hat_p_rf*ea0
+    wa_rf <- (1-hat_p_rf)/hat_p_rf*ea0_rf
   }
   
    ### outcome estimator
   out <- sum(ga*(In_Trial==0))/nrow(Target)
+  out_rf <- sum(ga_rf*(In_Trial==0))/nrow(Target)
 
   ### IPW estimator
   IPW <- sum((In_Trial==1)*(Whole$trt==a)*wa*Whole$Y)/nrow(Target)
@@ -118,7 +126,7 @@ Phi_hat <- function(a, Trials){
 
   ### normalized DR estimator
   DR <- out + sum((In_Trial==1)*(Whole$trt==a)*wa*(Whole$Y-ga))/nrow(Target)
-  DR_rf <- out + sum((In_Trial==1)*(Whole$trt==a)*wa_rf*(Whole$Y-ga))/nrow(Target)
+  DR_rf <- out_rf + sum((In_Trial==1)*(Whole$trt==a)*wa_rf*(Whole$Y-ga_rf))/nrow(Target)
 
  return(c(out, IPW, DR, IPW_rf, DR_rf))
 }
@@ -134,6 +142,13 @@ Phi <- function(a){
 }
 
 DR_split <- function(a, Trials){
+  variable_name <- names(Trials)[1:p]
+  cpt_variable_name <- variable_name[!is.na(apply(Trials[,1:p], 2, mean))] ### used for complete-variable estimators 
+                                                                        ### when between trial missingness exists
+  covariates <-  paste(variable_name, collapse="+")
+  covariates_outcome <- paste0(covariates, "+I(V2^2)")
+  cpt_covariates <- paste(cpt_variable_name, collapse="+")
+
   ### split trials and target
   n_trl <- nrow(Trials)
   n_tgt <- nrow(Target)
@@ -171,35 +186,52 @@ DR_split <- function(a, Trials){
   ga_fit_S2 <- glm(as.formula(paste0("Y~", covariates_outcome)), data=Trials_arm_S2, family="binomial")
   ga_S1 <- sapply(predict(ga_fit_S2, newdata=Whole_S1), expit)
 
+  #### ML ga prediction
+  ga_fit_rf_S1 <- randomForest(as.formula(paste0("Y~", covariates_outcome)), data=Trials_arm_S1, mtry=5)
+  ga_rf_S2 <- predict(ga_fit_rf_S1, newdata=Whole_S2, type="response")
+
+  ga_fit_rf_S2 <- randomForest(as.formula(paste0("Y~", covariates_outcome)), data=Trials_arm_S2, mtry=5)
+  ga_rf_S1 <- predict(ga_fit_rf_S2, newdata=Whole_S1, type="response")
+
   ### compute ea1
   ea1_fit_S1 <- glm(as.formula(paste0("trt~", covariates)), data=Trials_S1, family="binomial")
+  ea1_fit_rf_S1 <- randomForest(as.formula(paste0("trt~", covariates)), data=Trials_S1, mtry=5)
   ea1_S2 <- sapply(predict(ea1_fit_S1, Whole_S2), expit)  
+  ea1_rf_S2 <- predict(ea1_fit_rf_S1, newdata=Whole_S2, type="response")
   ea0_S2 <- 1-ea1_S2
+  ea0_rf_S2 <- 1-ea1_rf_S2
+
   ea1_fit_S2 <- glm(as.formula(paste0("trt~", covariates)), data=Trials_S2, family="binomial")
+  ea1_fit_rf_S2 <- randomForest(as.formula(paste0("trt~", covariates)), data=Trials_S2, mtry=5)
   ea1_S1 <- sapply(predict(ea1_fit_S2, Whole_S1), expit)  
+  ea1_rf_S1 <- predict(ea1_fit_rf_S2, newdata=Whole_S1, type="response")
   ea0_S1 <- 1-ea1_S1
+  ea0_rf_S1 <- 1-ea1_rf_S1
 
   if(a==1){
     wa_S1 <- (1-hat_p_S1)/hat_p_S1*ea1_S1
-    wa_rf_S1 <- (1-hat_p_rf_S1)/hat_p_rf_S1*ea1_S1
+    wa_rf_S1 <- (1-hat_p_rf_S1)/hat_p_rf_S1*ea1_rf_S1
     wa_S2 <- (1-hat_p_S2)/hat_p_S2*ea1_S2
-    wa_rf_S2 <- (1-hat_p_rf_S2)/hat_p_rf_S2*ea1_S2
+    wa_rf_S2 <- (1-hat_p_rf_S2)/hat_p_rf_S2*ea1_rf_S2
   }else{
     wa_S1 <- (1-hat_p_S1)/hat_p_S1*ea0_S1
-    wa_rf_S1 <- (1-hat_p_rf_S1)/hat_p_rf_S1*ea0_S1
+    wa_rf_S1 <- (1-hat_p_rf_S1)/hat_p_rf_S1*ea0_rf_S1
     wa_S2 <- (1-hat_p_S2)/hat_p_S2*ea0_S2
-    wa_rf_S2 <- (1-hat_p_rf_S2)/hat_p_rf_S2*ea0_S2
+    wa_rf_S2 <- (1-hat_p_rf_S2)/hat_p_rf_S2*ea0_rf_S2
   }
   
    ### outcome estimator
   out_S1 <- sum(ga_S1*(In_Trial_S1==0))/nrow(Target_S1)
   out_S2 <- sum(ga_S2*(In_Trial_S2==0))/nrow(Target_S2)
 
+  out_rf_S1 <- sum(ga_rf_S1*(In_Trial_S1==0))/nrow(Target_S1)
+  out_rf_S2 <- sum(ga_rf_S2*(In_Trial_S2==0))/nrow(Target_S2)
+
   ### normalized DR estimator
   DR_S1 <- out_S1 + sum((In_Trial_S1==1)*(Whole_S1$trt==a)*wa_S1*(Whole_S1$Y-ga_S1))/nrow(Target_S1)
   DR_S2 <- out_S2 + sum((In_Trial_S2==1)*(Whole_S2$trt==a)*wa_S2*(Whole_S2$Y-ga_S2))/nrow(Target_S2)
-  DR_rf_S1 <- out_S1 + sum((In_Trial_S1==1)*(Whole_S1$trt==a)*wa_rf_S1*(Whole_S1$Y-ga_S1))/nrow(Target_S1)
-  DR_rf_S2 <- out_S2 + sum((In_Trial_S2==1)*(Whole_S2$trt==a)*wa_rf_S2*(Whole_S2$Y-ga_S2))/nrow(Target_S2)
+  DR_rf_S1 <- out_rf_S1 + sum((In_Trial_S1==1)*(Whole_S1$trt==a)*wa_rf_S1*(Whole_S1$Y-ga_rf_S1))/nrow(Target_S1)
+  DR_rf_S2 <- out_rf_S2 + sum((In_Trial_S2==1)*(Whole_S2$trt==a)*wa_rf_S2*(Whole_S2$Y-ga_rf_S2))/nrow(Target_S2)
   return(c((DR_S1+DR_S2)/2, (DR_rf_S1+DR_rf_S2)/2))
 }
 
@@ -209,4 +241,4 @@ split_est <- DR_split(1, TrialData)-DR_split(0, TrialData)
 Res <- rbind(Res, c(true, est, split_est))
 }
 
-
+write.csv(Res, "toyexample_res.R")
