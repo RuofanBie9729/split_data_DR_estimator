@@ -18,12 +18,12 @@ ggplot(DR_res, aes(x=as.numeric(N), y=as.numeric(bias), color=estimator, group=e
 	geom_point()+
 	geom_hline(yintercept=0, linetype="dashed", color="red")
 
-test <- readRDS("hat_p_misspecified_n500.rds")
+test <- readRDS("toyexample_n1500_nn.rds")
 length(test)
 Res <- sapply(test, function(x){x[[1]]})
 boot_res <- sapply(test, function(x){x[[2]]})
-apply(Res, 1, mean)
-
+Est <- apply(Res, 1, mean)
+Est[2:7]-Est[1]
 boot_res <- rbind(Res[1,], boot_res)
 boot_ci <- function(x){
   true = x[1]
@@ -34,7 +34,7 @@ boot_ci <- function(x){
     boot_upper <- quantile(sort(boot), 0.975)
     return((boot_lower <= true) && (boot_upper >= true))
   }
-  coverage <- sapply(1:7, est_boot)
+  coverage <- sapply(1:6, est_boot)
   return(coverage)
 }
 coverage_res <- apply(boot_res, 2, boot_ci)

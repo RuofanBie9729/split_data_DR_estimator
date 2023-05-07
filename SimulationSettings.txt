@@ -1,0 +1,43 @@
+code file name | hat_p model 	      | ga model		   | RF | NN1 | NN2 | NN3 | SVM(L) | SVM(N) | gam | GBDT | Super-Learner |
+Sim1.R	   | linear main        | linear main	   |
+Sim2.R	   | linear quad        | linear main	   |
+Sim3.R	   | non-linear simple  | linear main	   |
+Sim4.R	   | non-linear complex | linear main	   |
+Sim5.R 	   | exp(βX)	      | linear quad	   |
+Sim6.R	   | linear main        | linear quad	   |
+Sim7.R	   | linear quad        | linear quad	   |
+Sim8.R	   | non-linear simple  | linear quad	   |	
+Sim9.R	   | non-linear complex | linear quad	   |
+Sim10.R 	   | exp(βX)	      | linear quad	   |
+Sim11.R	   | linear main        | non-linear simple  |
+Sim12.R	   | linear quad        | non-linear simple  |
+Sim13.R	   | non-linear simple  | non-linear simple  |
+Sim14.R	   | non-linear complex | non-linear simple  |
+Sim15.R 	   | exp(βX)	      | non-linear simple  |
+Sim16.R	   | linear main        | non-linear complex |
+Sim17.R	   | linear quad        | non-linear complex |
+Sim18.R	   | non-linear simple  | non-linear complex |
+Sim19.R	   | non-linear complex | non-linear complex |
+Sim20.R 	   | exp(βX)	      | non-linear complex |
+Sim21.R	   | linear main        | exp(βX)		   |
+Sim22.R	   | linear quad        | exp(βX)  		   |
+Sim23.R	   | non-linear simple  | exp(βX)		   |
+Sim24.R	   | non-linear complex | exp(βX)		   |
+Sim25.R 	   | exp(βX)	      | exp(βX)		   |
+
+
+linear main: logit(Pr(S=1|X)) = β + 1.2 X1 - 1.2 X2 + 1.2 X3 - 1.2 X4 + 1.2 X5
+		 logit(Pr(Y1|X)) = 1 + 0.5 X1 + 0.5 X2 + 0.5 X3 + 0.5 X4 + 0.5 X5
+		 logit(Pr(Y0|X)) = 1 - 0.5 X1 - 0.5 X2 - 0.5 X3 - 0.5 X4 - 0.5 X5
+linear quad: logit(Pr(S=1|X)) = β + 1.2 X1 - 1.2 X2 + 1.2 X3 - 1.2 X4 + 1.2 X5 + 2.4 X1^2 - 2.1 X2^2
+		 logit(Pr(Y1|X)) = 1 + 0.5 X1 + 0.5 X2 + 0.5 X3 + 0.5 X4 + 0.5 X5 + 1.2 X1^2 + 1.2 X2^2
+		 logit(Pr(Y0|X)) = 1 - 0.5 X1 - 0.5 X2 - 0.5 X3 - 0.5 X4 - 0.5 X5 - 1.2 X1^2 - 1.2 X2^2
+non-linear simple: logit(Pr(S=1|X)) = β + 1.2 sin(X1) - 1.2 cos(X2) + 1.2 sin(X3) - 1.2 X4 + 1.2 X5
+		 	 logit(Pr(Y1|X)) = 1 + 0.5 sin(X1) + 0.5 cos(X2) + 0.5 sin(X3) + 0.5 X4 + 0.5 X5
+		 	 logit(Pr(Y0|X)) = 1 - 0.5 sin(X1) - 0.5 cos(X2) - 0.5 sin(X3) - 0.5 X4 - 0.5 X5
+non-linear complex: logit(Pr(S=1|X)) = β + 1.2 sin(X1) + 1.2 cos(X2) - 1.2 sin(X3) + 1.2 X4 * sin(X1) - 1.2 X5 * cos(X2) + 1.2 sin(X1)^2 + 1.2 cos(X2)^2
+		 	  logit(Pr(Y1|X)) = 1 + 0.5 sin(X1) + 0.5 cos(X2) + 0.5 sin(X3) + 0.5 X4 * sin(X1) + 0.5 X5 * cos(X2) + 0.5 sin(X1)^2 + 0.5 cos(X2)^2
+		 	  logit(Pr(Y0|X)) = 1 - 0.5 sin(X1) - 0.5 cos(X2) - 0.5 sin(X3) - 0.5 X4 - 0.5 X5 - 0.5 X5 * cos(X2) - 0.5 sin(X1)^2 - 0.5 cos(X2)^2
+exp(βX): logit(Pr(S=1|X)) = β + exp [1.2 sin(X1) + 1.2 cos(X2) - 1.2 sin(X3)] - exp[1.2 X4 * sin(X1) - 1.2 X5 * cos(X2) + 1.2 sin(X1)^2 + 1.2 cos(X2)^2]
+	   logit(Pr(Y1|X)) = 1 + exp[0.5 sin(X1) + 0.5 cos(X2) + 0.5 sin(X3)] - exp[0.5 X4 * sin(X1) + 0.5 X5 * cos(X2) + 0.5 sin(X1)^2 + 0.5 cos(X2)^2]
+	   logit(Pr(Y0|X)) = 1 + exp[-0.5 sin(X1) - 0.5 cos(X2) - 0.5 sin(X3)] - exp[-0.5 X4 - 0.5 X5 - 0.5 X5 * cos(X2) - 0.5 sin(X1)^2 - 0.5 cos(X2)^2]
