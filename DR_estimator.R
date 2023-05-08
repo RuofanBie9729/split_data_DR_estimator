@@ -40,12 +40,6 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
      # for complete-case corrections
      cmp_varname <- varname[!anyNA]
   }
-  
-  ### convert varnames to text used in formula ###
-  MainEffect <- paste(varname, collapse = "+")
-  if ("R" %in% colnames(Trial)){
-     cmp_MainEffect <- paste(cmp_varname, collapse = "+")
-  }
 
   ### combine Trial and Target together as Whole dataset ###
   Target[, trtname] <- rep(0, nrow(Target))
