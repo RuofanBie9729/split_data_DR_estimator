@@ -1,11 +1,8 @@
 library(SuperLearner)
 library(keras)
 
-avoid_zero <- function(x){
-  x[x<0.001] <- 0.001
-}
-
-DR_Est <- function(Trial, Target, p = 5, Missing = FALSE){
+DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
+			 Trial_S = NULL, Target_S = NULL){
   ##############################################################################
   # Computes single-data doubly robust estimator of 
   # average treatment effect transported from trial to target
@@ -15,9 +12,13 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE){
   #   Target: the target dataframe containing (X)
   #   Missing: If true, between-trial missingness exists and 
   #	         complete-case corrections is needed. Default is FALSE.
+  #   split: If true, produce split data doubly robust estimators and Trial_S
+  #          and Target_S must not be NULL. Default is FALSE.
+  #   Trial_S: the test trial dataframe when "split = TRUE".
+  #   Target_S: the test target dataframe when "split = TRUE"
   #
   # Returns:
-  #   A vector of single-data DR estimators, using logistic model, 
+  #   A vector of single-data/split-data DR estimators, using logistic model, 
   #   random forest, 1-layer neural network, 2-layer neural neteork,
   #   3-layer neural network, SVM with linear kernal, 
   #	SVM with non-linear kernal, gam, GBDT, Super learner
@@ -72,59 +73,96 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE){
   hat_p_fit <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
                             family = binomial(),
 				    SL.library = "SL.glmnet")
-  hat_p <- predict(hat_p_fit, Whole)$library.predict
-  hat_p <- avoid_zero(hat_p)
+  hat_p <- as.vector(predict(hat_p_fit, Whole[, varname])$library.predict)
+  hat_p[hat_p < 0.001] <- 0.001
 
   # random forest
   hat_p_fit_rf <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
                                family = binomial(),
 					 SL.library = "SL.ranger")
-  hat_p_rf <- predict(hat_p_fit_rf, Whole)$library.predict
-  hat_p_rf <- avoid_zero(hat_p_rf)
+  hat_p_rf <- as.vector(predict(hat_p_fit_rf, Whole[,varname])$library.predict)
+  hat_p_rf[hat_p_rf < 0.001] <- 0.001
 
   # one-layer neural network
-  hat_p_fit_nnL1 <- keras_model_sequential(input_shape = ncol(Whole[ ,varname])) %>%
-  							 layer_dense(units = 16, activation = "relu") %>%
-  							 layer_dense(units = 2, activation = "sigmoid")
+  hat_p_fit_nnL1 <- keras_model_sequential() 
+  hat_p_fit_nnL1 %>% layer_dense(units = 64, activation = "relu", 
+					   input_shape = ncol(Whole[ ,varname])) %>%
+  			   layer_dense(units = 1, activation = "sigmoid")
   hat_p_fit_nnL1 %>% compile(optimizer = "rmsprop",
-                             loss = "binary_corssentropy",
-				     metrics = c("binary_corssentropy"))
-  hat_p_fit_nnL1 %>% fit(Whole[ ,varname], In_Trial, epochs = 100,
+                             loss = "binary_crossentropy",
+				     metrics = c("binary_crossentropy"))
+  hat_p_fit_nnL1 %>% fit(as.matrix(Whole[ ,varname]), In_Trial, epochs = 100,
 				 batch_size = 256, validation_split = 0.2,
 				 verbose = 0)
-  hat_p_nnL1 <- hat_p_fit_nnL1 %>% predict(Whole[, varname])
-  hat_p_nnL1 <- avoid_zero(hat_p_nnL1$loss)
+  hat_p_nnL1 <- hat_p_fit_nnL1 %>% predict(as.matrix(Whole[, varname]))
+  hat_p_nnL1 <- as.vector(hat_p_nnL1)
+  hat_p_nnL1[hat_p_nnL1 < 0.001] <- 0.001
+
+  # two-layer neural network
+  hat_p_fit_nnL2 <- keras_model_sequential() 
+  hat_p_fit_nnL2 %>% layer_dense(units = 64, activation = "relu", 
+					   input_shape = ncol(Whole[ ,varname])) %>%
+                     layer_dense(units = 64, activation = "relu") %>%
+  			   layer_dense(units = 1, activation = "sigmoid")
+  hat_p_fit_nnL2 %>% compile(optimizer = "rmsprop",
+                             loss = "binary_crossentropy",
+				     metrics = c("binary_crossentropy"))
+  hat_p_fit_nnL2 %>% fit(as.matrix(Whole[ ,varname]), In_Trial, epochs = 100,
+				 batch_size = 256, validation_split = 0.2,
+				 verbose = 0)
+  hat_p_nnL2 <- hat_p_fit_nnL2 %>% predict(as.matrix(Whole[, varname]))
+  hat_p_nnL2 <- as.vector(hat_p_nnL2)
+  hat_p_nnL2[hat_p_nnL2 < 0.001] <- 0.001  
+
+  # three-layer neural network
+  hat_p_fit_nnL3 <- keras_model_sequential() 
+  hat_p_fit_nnL3 %>% layer_dense(units = 64, activation = "relu", 
+					   input_shape = ncol(Whole[ ,varname])) %>%
+                     layer_dense(units = 64, activation = "relu") %>%
+			   layer_dense(units = 64, activation = "relu") %>%
+  			   layer_dense(units = 1, activation = "sigmoid")
+  hat_p_fit_nnL3 %>% compile(optimizer = "rmsprop",
+                             loss = "binary_crossentropy",
+				     metrics = c("binary_crossentropy"))
+  hat_p_fit_nnL3 %>% fit(as.matrix(Whole[ ,varname]), In_Trial, epochs = 100,
+				 batch_size = 256, validation_split = 0.2,
+				 verbose = 0)
+  hat_p_nnL3 <- hat_p_fit_nnL3 %>% predict(as.matrix(Whole[, varname]))
+  hat_p_nnL3 <- as.vector(hat_p_nnL3)
+  hat_p_nnL3[hat_p_nnL3 < 0.001] <- 0.001  
 
   # svm linear kernel
-  SL.svm.Liner = function(...) {
+  SL.svm.Linear = function(...) {
     SL.svm(..., kernel = "linear")
   }
   hat_p_fit_svmL <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
                                  family = binomial(),
 					   SL.library = "SL.svm.Linear")
-  hat_p_svmL <- predict(hat_p_fit_svmL, Whole)$library.predict
-  hat_p_svmL <- avoid_zero(hat_p_svmL)
+  hat_p_svmL <- predict(hat_p_fit_svmL, Whole[,varname])$library.predict
+  hat_p_svmL <- as.vector(hat_p_svmL)
+  hat_p_svmL[hat_p_svmL < 0.001] <- 0.001
 
   # svm radial kernel
   hat_p_fit_svm <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
                                 family = binomial(),
 					  SL.library = "SL.svm")
-  hat_p_svm <- predict(hat_p_fit_svm, Whole)$library.predict
-  hat_p_svm <- avoid_zero(hat_p_svm)
+  hat_p_svm <- predict(hat_p_fit_svm, Whole[,varname])$library.predict
+  hat_p_svm <- as.vector(hat_p_svm)
+  hat_p_svm[hat_p_svm < 0.001] <- 0.001
 
   # gam
   hat_p_fit_gam <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
                                 family = binomial(),
 					  SL.library = "SL.gam")
-  hat_p_gam <- predict(hat_p_fit_gam, Whole)$library.predict
-  hat_p_gam <- avoid_zero(hat_p_gam)
+  hat_p_gam <- as.vector(predict(hat_p_fit_gam, Whole[,varname])$library.predict)
+  hat_p_gam[hat_p_gam < 0.001] <- 0.001
 
   # GBDT
   hat_p_fit_gbdt <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
                                  family = binomial(),
 					   SL.library = "SL.xgboost")
-  hat_p_gbdt <- predict(hat_p_fit_gbdt, Whole)$library.predict
-  hat_p_gbdt <- avoid_zero(hat_p_gbdt)
+  hat_p_gbdt <- as.vector(predict(hat_p_fit_gbdt, Whole[,varname])$library.predict)
+  hat_p_gbdt[hat_p_gbdt < 0.001] <- 0.001
 
   # SuperLearner
   hat_p_fit_SL <- SuperLearner(Y = In_Trial, X = Whole[, varname], 
@@ -132,8 +170,9 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE){
 					 SL.library = c("SL.glmnet", "SL.ranger", 
                                               "SL.gam", "SL.svm", 
                                               "SL.nnet", "SL.xgboost"))
-  hat_p_SL <- predict(hat_p_fit_SL, Whole)$libeary.predict
-  hat_p_SL <- avoid_zero(hat_p_SL)
+  hat_p_SL <- predict(hat_p_fit_SL, Whole[,varname], onlySL = TRUE)$pred
+  hat_p_SL <- as.vector(hat_p_SL)
+  hat_p_SL[hat_p_SL < 0.001] <- 0.001.
 
   ### compute ga
   Trials_arm <- Trials[which(Trials$trt==a),]
