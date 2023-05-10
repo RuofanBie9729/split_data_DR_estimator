@@ -1,7 +1,8 @@
 library(SuperLearner)
 library(keras)
+#install_keras()
 
-DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
+DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE,
 			 Trial_S = NULL, Target_S = NULL){
   ##############################################################################
   # Computes single-data doubly robust estimator of 
@@ -44,13 +45,13 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   ### combine Trial and Target together as Whole dataset ###
   Target[, trtname] <- rep(0, nrow(Target))
   Target[, outname] <- rep(0, nrow(Target))
-  if (split = TRUE){
+  if (split == TRUE){
      Target_S[, trtname] <- rep(0, nrow(Target_S))
      Target_S[, outname] <- rep(0, nrow(Target_S))
   }
   if ("R" %in% colnames(Trial)){
      # If within-trial missingness exists, get complete cases for model fitting
-     cmp_Trial <- Trial[Trial$R==1, ]
+     cmp_Trial <- Trial[Trial[, "R"]==1, ]
      Whole <- rbind(cmp_Trial[, c(varname, trtname, outname)], 
 		     	  Target[, c(varname, trtname, outname)])
      In_Trial <- c(rep(1, nrow(cmp_Trial)), rep(0, nrow(Target)))
@@ -61,8 +62,8 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
 		     		Target[, c(varname, trtname, outname)])
 
      # Get whole and complete whole datasets for split-data estimators
-     if (split = TRUE){
-         cmp_Trial_S <- Trial_S[Trial_S$R=1, ]
+     if (split == TRUE){
+         cmp_Trial_S <- Trial_S[Trial_S[, "R"]==1, ]
          Whole_S <- rbind(cmp_Trial_S[, c(varname, trtname, outname)], 
 		     	  	  Target_S[, c(varname, trtname, outname)])
          In_Trial_S <- c(rep(1, nrow(cmp_Trial_S)), rep(0, nrow(Target_S)))
@@ -75,13 +76,13 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
      In_Trial <- c(rep(1, nrow(Trial)), rep(0, nrow(Target)))
      Whole <- cbind(Whole, In_Trial)
      
-     if (split = TRUE){
+     if (split == TRUE){
         Whole_S <- rbind(Trial_S[, c(varname, trtname, outname)], 
 		        	 Target_S[, c(varname, trtname, outname)])
 	  In_Trial_S <- c(rep(1, nrow(Trial_S)), rep(0, nrow(Target_S)))
      }
   }
-  if (split = TRUE){
+  if (split == TRUE){
      testX <- Whole_S[, varname]
   }else{
      testX <- Whole[, varname]
@@ -112,7 +113,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                              loss = "binary_crossentropy",
 				     metrics = c("binary_crossentropy"))
   hat_p_fit_nnL1 %>% fit(as.matrix(p_trainX), p_trainY, epochs = 100,
-				 batch_size = 256, validation_split = 0.2,
+				 batch_size = 512, validation_split = 0.2,
 				 verbose = 0)
   hat_p_nnL1 <- hat_p_fit_nnL1 %>% predict(as.matrix(testX))
   hat_p_nnL1 <- as.vector(hat_p_nnL1)
@@ -128,7 +129,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                              loss = "binary_crossentropy",
 				     metrics = c("binary_crossentropy"))
   hat_p_fit_nnL2 %>% fit(as.matrix(p_trainX), p_trainY, epochs = 100,
-				 batch_size = 256, validation_split = 0.2,
+				 batch_size = 512, validation_split = 0.2,
 				 verbose = 0)
   hat_p_nnL2 <- hat_p_fit_nnL2 %>% predict(as.matrix(testX))
   hat_p_nnL2 <- as.vector(hat_p_nnL2)
@@ -145,7 +146,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                              loss = "binary_crossentropy",
 				     metrics = c("binary_crossentropy"))
   hat_p_fit_nnL3 %>% fit(as.matrix(p_trainX), p_trainY, epochs = 100,
-				 batch_size = 256, validation_split = 0.2,
+				 batch_size = 512, validation_split = 0.2,
 				 verbose = 0)
   hat_p_nnL3 <- hat_p_fit_nnL3 %>% predict(as.matrix(testX))
   hat_p_nnL3 <- as.vector(hat_p_nnL3)
@@ -153,7 +154,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
 
   # svm linear kernel
   SL.svm.Linear = function(...) {
-    SL.svm(..., kernel = "linear")
+    SL.svm(..., kernel = "linear", nu = 0.1)
   }
   hat_p_fit_svmL <- SuperLearner(Y = p_trainY, X = p_trainX, 
                                  family = binomial(),
@@ -163,9 +164,12 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   hat_p_svmL[hat_p_svmL < 0.001] <- 0.001
 
   # svm radial kernel
+  SL.svm.smNu = function(...) {
+    SL.svm(..., nu = 0.1)
+  }
   hat_p_fit_svm <- SuperLearner(Y = p_trainY, X = p_trainX, 
                                 family = binomial(),
-					  SL.library = "SL.svm")
+					  SL.library = "SL.svm.smNu")
   hat_p_svm <- predict(hat_p_fit_svm, testX)$library.predict
   hat_p_svm <- as.vector(hat_p_svm)
   hat_p_svm[hat_p_svm < 0.001] <- 0.001
@@ -188,7 +192,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   hat_p_fit_SL <- SuperLearner(Y = p_trainY, X = p_trainX, 
                                family = binomial(),
 					 SL.library = c("SL.glmnet", "SL.ranger", 
-                                              "SL.gam", "SL.svm", 
+                                              "SL.gam", "SL.svm.smNu", 
                                               "SL.nnet", "SL.xgboost"))
   hat_p_SL <- predict(hat_p_fit_SL, testX, onlySL = TRUE)$pred
   hat_p_SL <- as.vector(hat_p_SL)
@@ -260,7 +264,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   ga1_nnL3 <- as.vector(ga1_nnL3)
   ga1_nnL3[ga1_nnL3 < 0.001] <- 0.001
 
-  # svm linear function
+  # svm linear function  
   ga1_fit_svmL <- SuperLearner(Y = ga1_trainY, X = ga1_trainX, 
                                family = binomial(),
 					 SL.library = "SL.svm.Linear")
@@ -271,7 +275,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   # svm radial kernel
   ga1_fit_svm <- SuperLearner(Y = ga1_trainY, X = ga1_trainX, 
                               family = binomial(),
-					SL.library = "SL.svm")
+					SL.library = "SL.svm.smNu")
   ga1_svm <- predict(ga1_fit_svm, testX)$library.predict
   ga1_svm <- as.vector(ga1_svm)
   ga1_svm[ga1_svm < 0.001] <- 0.001
@@ -294,7 +298,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   ga1_fit_SL <- SuperLearner(Y = ga1_trainY, X = ga1_trainX, 
                              family = binomial(),
 				     SL.library = c("SL.glmnet", "SL.ranger", 
-                                            "SL.gam", "SL.svm", 
+                                            "SL.gam", "SL.svm.smNu", 
                                             "SL.nnet", "SL.xgboost"))
   ga1_SL <- predict(ga1_fit_SL, testX, onlySL = TRUE)$pred
   ga1_SL <- as.vector(ga1_SL)
@@ -377,7 +381,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   # svm radial kernel
   ga0_fit_svm <- SuperLearner(Y = ga0_trainY, X = ga0_trainX, 
                               family = binomial(),
-					SL.library = "SL.svm")
+					SL.library = "SL.svm.smNu")
   ga0_svm <- predict(ga0_fit_svm, testX)$library.predict
   ga0_svm <- as.vector(ga0_svm)
   ga0_svm[ga0_svm < 0.001] <- 0.001
@@ -400,7 +404,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   ga0_fit_SL <- SuperLearner(Y = ga0_trainY, X = ga0_trainX, 
                              family = binomial(),
 				     SL.library = c("SL.glmnet", "SL.ranger", 
-                                            "SL.gam", "SL.svm", 
+                                            "SL.gam", "SL.svm.smNu", 
                                             "SL.nnet", "SL.xgboost"))
   ga0_SL <- predict(ga0_fit_SL, testX, onlySL = TRUE)$pred
   ga0_SL <- as.vector(ga0_SL)
@@ -437,7 +441,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                            loss = "binary_crossentropy",
 				   metrics = c("binary_crossentropy"))
   ea1_fit_nnL1 %>% fit(as.matrix(ea1_trainX), ea1_trainY, epochs = 100,
-			     batch_size = 256, validation_split = 0.2,
+			     batch_size = 512, validation_split = 0.2,
 			     verbose = 0)
   ea1_nnL1 <- ea1_fit_nnL1 %>% predict(as.matrix(testX))
   ea1_nnL1 <- as.vector(ea1_nnL1)
@@ -455,7 +459,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                            loss = "binary_crossentropy",
 				   metrics = c("binary_crossentropy"))
   ea1_fit_nnL2 %>% fit(as.matrix(ea1_trainX), ea1_trainY, epochs = 100,
-			     batch_size = 256, validation_split = 0.2,
+			     batch_size = 512, validation_split = 0.2,
 			     verbose = 0)
   ea1_nnL2 <- ea1_fit_nnL2 %>% predict(as.matrix(testX))
   ea1_nnL2 <- as.vector(ea1_nnL2)
@@ -474,7 +478,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                            loss = "binary_crossentropy",
 				   metrics = c("binary_crossentropy"))
   ea1_fit_nnL3 %>% fit(as.matrix(ea1_trainX), ea1_trainY, epochs = 100,
-			     batch_size = 256, validation_split = 0.2,
+			     batch_size = 512, validation_split = 0.2,
 			     verbose = 0)
   ea1_nnL3 <- ea1_fit_nnL3 %>% predict(as.matrix(testX))
   ea1_nnL3 <- as.vector(ea1_nnL3)
@@ -495,7 +499,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   # svm radial kernel
   ea1_fit_svm <- SuperLearner(Y = ea1_trainY, X = ea1_trainX, 
                               family = binomial(),
-					SL.library = "SL.svm")
+					SL.library = "SL.svm.smNu")
   ea1_svm <- predict(ea1_fit_svm, testX)$library.predict
   ea1_svm <- as.vector(ea1_svm)
   ea0_svm <- 1 - ea1_svm
@@ -524,7 +528,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   ea1_fit_SL <- SuperLearner(Y = ea1_trainY, X = ea1_trainX, 
                              family = binomial(),
 				     SL.library = c("SL.glmnet", "SL.ranger", 
-                                            "SL.gam", "SL.svm", 
+                                            "SL.gam", "SL.svm.smNu", 
                                             "SL.nnet", "SL.xgboost"))
   ea1_SL <- predict(ea1_fit_SL, testX, onlySL = TRUE)$pred
   ea1_SL <- as.vector(ea1_SL)
@@ -556,7 +560,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   wa0_SL <- (1 - hat_p_SL)/hat_p_SL * ea0_SL
 
   ### outcome estimator ###
-  if (split = TRUE){
+  if (split == TRUE){
      out1 <- sum(ga1*(In_Trial_S==0))/nrow(Target_S)
      out1_rf <- sum(ga1_rf*(In_Trial_S==0))/nrow(Target_S)
      out1_nnL1 <- sum(ga1_nnL1*(In_Trial_S==0))/nrow(Target_S)
@@ -603,7 +607,7 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
   }
 
   ### normalized DR estimator
-  if (split = TRUE){
+  if (split == TRUE){
      DR1 <- out1 + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1 * 
                        (Whole_S[ ,outname] - ga1))/nrow(Target_S)
      DR1_rf <- out1_rf + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1_rf * 
@@ -645,9 +649,51 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE
                        (Whole_S[ ,outname] - ga0_gbdt))/nrow(Target_S)
      DR0_SL <- out0_SL + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==0) * wa0_SL * 
                        (Whole_S[ ,outname] - ga0_SL))/nrow(Target_S)
+  }else{
+     DR1 <- out1 + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1 * 
+                       (Whole[ ,outname] - ga1))/nrow(Target)
+     DR1_rf <- out1_rf + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_rf * 
+                       (Whole[ ,outname] - ga1_rf))/nrow(Target)
+     DR1_nnL1 <- out1_nnL1 + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_nnL1 * 
+                       (Whole[ ,outname] - ga1_nnL1))/nrow(Target)
+     DR1_nnL2 <- out1_nnL2 + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_nnL2 * 
+                       (Whole[ ,outname] - ga1_nnL2))/nrow(Target)
+     DR1_nnL3 <- out1_nnL3 + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_nnL3 * 
+                       (Whole[ ,outname] - ga1_nnL3))/nrow(Target)
+     DR1_svmL <- out1_svmL + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_svmL * 
+                       (Whole[ ,outname] - ga1_svmL))/nrow(Target)
+     DR1_svm <- out1_svm + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_svm * 
+                       (Whole[ ,outname] - ga1_svm))/nrow(Target)
+     DR1_gam <- out1_gam + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_gam * 
+                       (Whole[ ,outname] - ga1_gam))/nrow(Target)
+     DR1_gbdt <- out1_gbdt + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_gbdt * 
+                       (Whole[ ,outname] - ga1_gbdt))/nrow(Target)
+     DR1_SL <- out1_SL + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_SL * 
+                       (Whole[ ,outname] - ga1_SL))/nrow(Target)
+
+     DR0 <- out0 + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0 * 
+                       (Whole[ ,outname] - ga0))/nrow(Target)
+     DR0_rf <- out0_rf + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_rf * 
+                       (Whole[ ,outname] - ga0_rf))/nrow(Target)
+     DR0_nnL1 <- out0_nnL1 + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_nnL1 * 
+                       (Whole[ ,outname] - ga0_nnL1))/nrow(Target)
+     DR0_nnL2 <- out0_nnL2 + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_nnL2 * 
+                       (Whole[ ,outname] - ga0_nnL2))/nrow(Target)
+     DR0_nnL3 <- out0_nnL3 + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_nnL3 * 
+                       (Whole[ ,outname] - ga0_nnL3))/nrow(Target)
+     DR0_svmL <- out0_svmL + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_svmL * 
+                       (Whole[ ,outname] - ga0_svmL))/nrow(Target)
+     DR0_svm <- out0_svm + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_svm * 
+                       (Whole[ ,outname] - ga0_svm))/nrow(Target)
+     DR0_gam <- out0_gam + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_gam * 
+                       (Whole[ ,outname] - ga0_gam))/nrow(Target)
+     DR0_gbdt <- out0_gbdt + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_gbdt * 
+                       (Whole[ ,outname] - ga0_gbdt))/nrow(Target)
+     DR0_SL <- out0_SL + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_SL * 
+                       (Whole[ ,outname] - ga0_SL))/nrow(Target)
   }
 
  return(c(DR1 - DR0, DR1_rf - DR0_rf, DR1_nnL1 - DR0_nnL1, DR1_nnL2 - DR0_nnL2, 
           DR1_nnL3 - DR0_nnL3, DR1_svmL - DR0_svmL, DR1_svm - DR0_svm, 
-          DR1_gam - DR_gam0, DR1_gbdt - DR0_gbdt, DR1_SL - DR0_SL))
+          DR1_gam - DR0_gam, DR1_gbdt - DR0_gbdt, DR1_SL - DR0_SL))
 }

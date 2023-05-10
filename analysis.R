@@ -39,3 +39,18 @@ boot_ci <- function(x){
 }
 coverage_res <- apply(boot_res, 2, boot_ci)
 apply(coverage_res, 1, mean)
+
+
+ResTab <- NULL
+for(i in 1:10){
+  filename <- paste0("Sim", i, ".rds")
+  rawRes <- readRDS(filename)
+  Res <- sapply(rawRes, function(x) x)
+  Est <- apply(Res, 1, mean)
+  ResTab <- rbind(ResTab, c(Est[1], Est[2:21]-Est[1]))
+}
+colnames(ResTab) <- c("ATE", "glm", "rf", "nnL1", "nnL2", "nnL3", "svmL", "svm", 
+                      "gam", "gbdt", "SL", "glm_sp", "rf_sp", "nnL1_sp", 
+                      "nnL2_sp", "nnL3_sp", "svmL_sp", "svm_sp", "gam_sp", 
+                      "gbdt_sp", "SL_sp")
+write.csv(ResTab, "SimRes.csv")
