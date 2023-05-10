@@ -2,13 +2,38 @@ library(SuperLearner)
 library(keras)
 #install_keras()
 
-DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE,
-			 Trial_S = NULL, Target_S = NULL){
+case_weight <- function(data, Y){
+  ###############################
+  # Computes the case weights for 
+  # imbalanced dataset.
+  # Args:
+  #   data: dataframe which contains
+  #         a column named as Y
+  #   Y: character which is the name 
+  #      of a column in data
+  ###############################
+  if (!is.character(Y)){
+     Error("Y should be a character")
+  }
+  if (!(Y %in% colnames(data))){
+     Error("Y should be in the dataset")
+  }
+  w <- 1/table(data[,Y])
+  w <- w/sum(w)
+  weights <- rep(0, nrow(data))
+  weights[data[,Y]==0] = w["0"]
+  weights[data[,Y]==1] = w["1"]
+  return(weights)
+}
+
+DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE, 
+                   split = FALSE, Trial_S = NULL, Target_S = NULL){
   ##############################################################################
   # Computes single-data doubly robust estimator of 
   # average treatment effect transported from trial to target
   # Args:
   #   p: numeric number indicating the number of covariates in X
+  #   nu: numeric number used in SVM method settings
   #   Trial: the trial dataframe containing (X, A, Y) or (X, A, Y, R)
   #   Target: the target dataframe containing (X)
   #   Missing: If true, between-trial missingness exists and 
@@ -87,21 +112,36 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE,
   }else{
      testX <- Whole[, varname]
   }
+
+  ### define svm with hyperparameters ###
+  SL.svm.Linear = function(...) {
+    SL.svm(..., kernel = "linear", nu = nu)
+  }
+
+  SL.svm.smNu = function(...) {
+    SL.svm(..., nu = nu)
+  }
+
   ### compute hat_p ###
   p_trainX <- Whole[, varname]
   p_trainY <- In_Trial
+  p_weights <- case_weight(Whole, "In_Trial")
+  # SuperLearner
+  hat_p_fit_SL <- SuperLearner(Y = p_trainY, X = p_trainX, 
+                               family = binomial(), obsWeights = p_weights,
+                               SL.library = c("SL.glmnet", "SL.ranger", 
+                                              "SL.gam", "SL.svm.smNu", 
+                                              "SL.nnet", "SL.xgboost"))
+  hat_p_ML <- predict(hat_p_fit_SL, testX)
+  hat_p_SL <- as.vector(hat_p_ML$pred)
+  hat_p_SL[hat_p_SL < 0.001] <- 0.001
+
   # logistic model
-  hat_p_fit <- SuperLearner(Y = p_trainY, X = p_trainX, 
-                            family = binomial(),
-				    SL.library = "SL.glmnet")
-  hat_p <- as.vector(predict(hat_p_fit, testX)$library.predict)
+  hat_p <- as.vector(hat_p_ML$library.predict[,1])
   hat_p[hat_p < 0.001] <- 0.001
 
   # random forest
-  hat_p_fit_rf <- SuperLearner(Y = p_trainY, X = p_trainX,  
-                               family = binomial(),
-					 SL.library = "SL.ranger")
-  hat_p_rf <- as.vector(predict(hat_p_fit_rf, testX)$library.predict)
+  hat_p_rf <- as.vector(hat_p_ML$library.predict[,2])
   hat_p_rf[hat_p_rf < 0.001] <- 0.001
 
   # one-layer neural network
@@ -153,50 +193,20 @@ DR_Est <- function(Trial, Target, p = 5, Missing = FALSE, split = FALSE,
   hat_p_nnL3[hat_p_nnL3 < 0.001] <- 0.001  
 
   # svm linear kernel
-  SL.svm.Linear = function(...) {
-    SL.svm(..., kernel = "linear", nu = 0.1)
-  }
-  hat_p_fit_svmL <- SuperLearner(Y = p_trainY, X = p_trainX, 
-                                 family = binomial(),
-					   SL.library = "SL.svm.Linear")
-  hat_p_svmL <- predict(hat_p_fit_svmL, testX)$library.predict
-  hat_p_svmL <- as.vector(hat_p_svmL)
+  hat_p_svmL <- as.vector(hat_p_ML$library.predict[,3])
   hat_p_svmL[hat_p_svmL < 0.001] <- 0.001
 
   # svm radial kernel
-  SL.svm.smNu = function(...) {
-    SL.svm(..., nu = 0.1)
-  }
-  hat_p_fit_svm <- SuperLearner(Y = p_trainY, X = p_trainX, 
-                                family = binomial(),
-					  SL.library = "SL.svm.smNu")
-  hat_p_svm <- predict(hat_p_fit_svm, testX)$library.predict
-  hat_p_svm <- as.vector(hat_p_svm)
+  hat_p_svm <- as.vector(hat_p_ML$library.predict[,4])
   hat_p_svm[hat_p_svm < 0.001] <- 0.001
 
   # gam
-  hat_p_fit_gam <- SuperLearner(Y = p_trainY, X = p_trainX, 
-                                family = binomial(),
-					  SL.library = "SL.gam")
-  hat_p_gam <- as.vector(predict(hat_p_fit_gam, testX)$library.predict)
+  hat_p_gam <- as.vector(hat_p_ML$library.predict[,5])
   hat_p_gam[hat_p_gam < 0.001] <- 0.001
 
   # GBDT
-  hat_p_fit_gbdt <- SuperLearner(Y = p_trainY, X = p_trainX, 
-                                 family = binomial(),
-					   SL.library = "SL.xgboost")
-  hat_p_gbdt <- as.vector(predict(hat_p_fit_gbdt, testX)$library.predict)
+  hat_p_gbdt <- as.vector(hat_p_ML$library.predict[,6])
   hat_p_gbdt[hat_p_gbdt < 0.001] <- 0.001
-
-  # SuperLearner
-  hat_p_fit_SL <- SuperLearner(Y = p_trainY, X = p_trainX, 
-                               family = binomial(),
-					 SL.library = c("SL.glmnet", "SL.ranger", 
-                                              "SL.gam", "SL.svm.smNu", 
-                                              "SL.nnet", "SL.xgboost"))
-  hat_p_SL <- predict(hat_p_fit_SL, testX, onlySL = TRUE)$pred
-  hat_p_SL <- as.vector(hat_p_SL)
-  hat_p_SL[hat_p_SL < 0.001] <- 0.001
 
   ### compute ga when a = 1 ###
   ga1_trainX <- Trial[which(Trial[,trtname] == 1), varname]
