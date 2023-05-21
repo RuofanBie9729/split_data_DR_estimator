@@ -22,8 +22,7 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   # Returns:
   #   A vector of single-data/split-data DR estimators, using logistic model, 
   #   random forest, 1-layer neural network, 2-layer neural neteork,
-  #   3-layer neural network, SVM with linear kernal, 
-  #	SVM with non-linear kernal, gam, GBDT, Super learner
+  #   3-layer neural network, gam, GBDT, Super learner
   ##############################################################################
   # 
   ### check for NAs ###
@@ -89,15 +88,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
      testX <- Whole[, varname]
   }
 
-  ### define svm with hyperparameters ###
-  SL.ksvm.Linear = function(...) {
-    SL.ksvm(..., kernel = "vanilladot", nu = nu)
-  }
-
-  SL.ksvm.smNu = function(...) {
-    SL.ksvm(..., nu = nu)
-  }
-
   ### compute hat_p ###
   p_trainX <- Whole[, varname]
   p_trainY <- In_Trial
@@ -105,7 +95,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   hat_p_fit_SL <- SuperLearner(Y = p_trainY, X = p_trainX, 
                                family = binomial(),
                                SL.library = c("SL.glmnet", "SL.ranger", 
-                                              "SL.ksvm.Linear", "SL.ksvm.smNu", 
                                               "SL.gam", "SL.nnet", "SL.xgboost"))
   hat_p_ML <- predict(hat_p_fit_SL, testX)
   hat_p_SL <- as.vector(hat_p_ML$pred)
@@ -167,20 +156,12 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   hat_p_nnL3 <- as.vector(hat_p_nnL3)
   hat_p_nnL3[hat_p_nnL3 < 0.001] <- 0.001  
 
-  # svm linear kernel
-  hat_p_svmL <- as.vector(hat_p_ML$library.predict[,3])
-  hat_p_svmL[hat_p_svmL < 0.001] <- 0.001
-
-  # svm radial kernel
-  hat_p_svm <- as.vector(hat_p_ML$library.predict[,4])
-  hat_p_svm[hat_p_svm < 0.001] <- 0.001
-
   # gam
-  hat_p_gam <- as.vector(hat_p_ML$library.predict[,5])
+  hat_p_gam <- as.vector(hat_p_ML$library.predict[,3])
   hat_p_gam[hat_p_gam < 0.001] <- 0.001
 
   # GBDT
-  hat_p_gbdt <- as.vector(hat_p_ML$library.predict[,7])
+  hat_p_gbdt <- as.vector(hat_p_ML$library.predict[,5])
   hat_p_gbdt[hat_p_gbdt < 0.001] <- 0.001
 
   ### compute ga when a = 1 ###
@@ -190,8 +171,7 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   # SuperLearner
   ga1_fit_SL <- SuperLearner(Y = ga1_trainY, X = ga1_trainX, 
                              family = binomial(),
-				             SL.library = c("SL.glmnet", "SL.ranger", 
-                                            "SL.ksvm.Linear", "SL.ksvm.smNu", 
+                             SL.library = c("SL.glmnet", "SL.ranger", 
                                             "SL.gam", "SL.nnet", "SL.xgboost"))
   ga1_ML <- predict(ga1_fit_SL, testX)
   ga1_SL <- as.vector(ga1_ML$pred)
@@ -253,20 +233,12 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   ga1_nnL3 <- as.vector(ga1_nnL3)
   ga1_nnL3[ga1_nnL3 < 0.001] <- 0.001
 
-  # svm linear function  
-  ga1_svmL <- as.vector(ga1_ML$library.predict[,3])
-  ga1_svmL[ga1_svmL < 0.001] <- 0.001
-
-  # svm radial kernel
-  ga1_svm <- as.vector(ga1_ML$library.predict[,4])
-  ga1_svm[ga1_svm < 0.001] <- 0.001
-
   # gam
-  ga1_gam <- as.vector(ga1_ML$library.predict[,5])
+  ga1_gam <- as.vector(ga1_ML$library.predict[,3])
   ga1_gam[ga1_gam < 0.001] <- 0.001
 
   # GBDT
-  ga1_gbdt <- as.vector(ga1_ML$library.predict[,7])
+  ga1_gbdt <- as.vector(ga1_ML$library.predict[,5])
   ga1_gbdt[ga1_gbdt < 0.001] <- 0.001
   
 
@@ -278,7 +250,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   ga0_fit_SL <- SuperLearner(Y = ga0_trainY, X = ga0_trainX, 
                              family = binomial(),
 				             SL.library = c("SL.glmnet", "SL.ranger", 
-                                            "SL.ksvm.Linear", "SL.ksvm.smNu", 
                                             "SL.gam", "SL.nnet", "SL.xgboost"))
   ga0_ML <- predict(ga0_fit_SL, testX)
   ga0_SL <- as.vector(ga0_ML$pred)
@@ -340,20 +311,12 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   ga0_nnL3 <- as.vector(ga0_nnL3)
   ga0_nnL3[ga0_nnL3 < 0.001] <- 0.001
 
-  # svm linear function
-  ga0_svmL <- as.vector(ga0_ML$library.predict[,3])
-  ga0_svmL[ga0_svmL < 0.001] <- 0.001
-
-  # svm radial kernel
-  ga0_svm <- as.vector(ga0_ML$library.predict[,4])
-  ga0_svm[ga0_svm < 0.001] <- 0.001
-
   # gam
-  ga0_gam <- as.vector(ga0_ML$library.predict[,5])
+  ga0_gam <- as.vector(ga0_ML$library.predict[,3])
   ga0_gam[ga0_gam < 0.001] <- 0.001
 
   # GBDT
-  ga0_gbdt <- as.vector(ga0_ML$library.predict[,7])
+  ga0_gbdt <- as.vector(ga0_ML$library.predict[,5])
   ga0_gbdt[ga0_gbdt < 0.001] <- 0.001
   
 
@@ -365,7 +328,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   ea1_fit_SL <- SuperLearner(Y = ea1_trainY, X = ea1_trainX, 
                              family = binomial(),
 				             SL.library = c("SL.glmnet", "SL.ranger", 
-                                            "SL.ksvm.Linear", "SL.ksvm.smNu", 
                                             "SL.gam", "SL.nnet", "SL.xgboost"))
   ea1_ML <- predict(ea1_fit_SL, testX)
   ea1_SL <- as.vector(ea1_ML$pred)
@@ -439,26 +401,14 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   ea1_nnL3[ea1_nnL3 < 0.001] <- 0.001
   ea0_nnL3[ea0_nnL3 < 0.001] <- 0.001
 
-  # svm linear function
-  ea1_svmL <- as.vector(ea1_ML$library.predict[,3])
-  ea0_svmL <- 1 - ea1_svmL
-  ea1_svmL[ea1_svmL < 0.001] <- 0.001
-  ea0_svmL[ea0_svmL < 0.001] <- 0.001
-
-  # svm radial kernel
-  ea1_svm <- as.vector(ea1_ML$library.predict[,4])
-  ea0_svm <- 1 - ea1_svm
-  ea1_svm[ea1_svm < 0.001] <- 0.001
-  ea0_svm[ea0_svm < 0.001] <- 0.001
-
   # gam
-  ea1_gam <- as.vector(ea1_ML$library.predict[,5])
+  ea1_gam <- as.vector(ea1_ML$library.predict[,3])
   ea0_gam <- 1 - ea1_gam
   ea1_gam[ea1_gam < 0.001] <- 0.001
   ea0_gam[ea0_gam < 0.001] <- 0.001
 
   # GBDT
-  ea1_gbdt <- as.vector(ea1_ML$library.predict[,7])
+  ea1_gbdt <- as.vector(ea1_ML$library.predict[,5])
   ea0_gbdt <- 1 - ea1_gbdt
   ea1_gbdt[ea1_gbdt < 0.001] <- 0.001
   ea0_gbdt[ea0_gbdt < 0.001] <- 0.001
@@ -470,8 +420,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   wa1_nnL1 <- (1 - hat_p_nnL1)/hat_p_nnL1 * ea1_nnL1
   wa1_nnL2 <- (1 - hat_p_nnL2)/hat_p_nnL2 * ea1_nnL2
   wa1_nnL3 <- (1 - hat_p_nnL3)/hat_p_nnL3 * ea1_nnL3
-  wa1_svmL <- (1 - hat_p_svmL)/hat_p_svmL * ea1_svmL
-  wa1_svm <- (1 - hat_p_svm)/hat_p_svm * ea1_svm
   wa1_gam <- (1 - hat_p_gam)/hat_p_gam * ea1_gam
   wa1_gbdt <- (1 - hat_p_gbdt)/hat_p_gbdt * ea1_gbdt
   wa1_SL <- (1 - hat_p_SL)/hat_p_SL * ea1_SL
@@ -481,8 +429,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   wa0_nnL1 <- (1 - hat_p_nnL1)/hat_p_nnL1 * ea0_nnL1
   wa0_nnL2 <- (1 - hat_p_nnL2)/hat_p_nnL2 * ea0_nnL2
   wa0_nnL3 <- (1 - hat_p_nnL3)/hat_p_nnL3 * ea0_nnL3
-  wa0_svmL <- (1 - hat_p_svmL)/hat_p_svmL * ea0_svmL
-  wa0_svm <- (1 - hat_p_svm)/hat_p_svm * ea0_svm
   wa0_gam <- (1 - hat_p_gam)/hat_p_gam * ea0_gam
   wa0_gbdt <- (1 - hat_p_gbdt)/hat_p_gbdt * ea0_gbdt
   wa0_SL <- (1 - hat_p_SL)/hat_p_SL * ea0_SL
@@ -494,8 +440,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
      out1_nnL1 <- sum(ga1_nnL1*(In_Trial_S==0))/nrow(Target_S)
      out1_nnL2 <- sum(ga1_nnL2*(In_Trial_S==0))/nrow(Target_S)
      out1_nnL3 <- sum(ga1_nnL3*(In_Trial_S==0))/nrow(Target_S)
-     out1_svmL <- sum(ga1_svmL*(In_Trial_S==0))/nrow(Target_S)
-     out1_svm <- sum(ga1_svm*(In_Trial_S==0))/nrow(Target_S)
      out1_gam <- sum(ga1_gam*(In_Trial_S==0))/nrow(Target_S)
      out1_gbdt <- sum(ga1_gbdt*(In_Trial_S==0))/nrow(Target_S)
      out1_SL <- sum(ga1_SL*(In_Trial_S==0))/nrow(Target_S)
@@ -505,8 +449,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
      out0_nnL1 <- sum(ga0_nnL1*(In_Trial_S==0))/nrow(Target_S)
      out0_nnL2 <- sum(ga0_nnL2*(In_Trial_S==0))/nrow(Target_S)
      out0_nnL3 <- sum(ga0_nnL3*(In_Trial_S==0))/nrow(Target_S)
-     out0_svmL <- sum(ga0_svmL*(In_Trial_S==0))/nrow(Target_S)
-     out0_svm <- sum(ga0_svm*(In_Trial_S==0))/nrow(Target_S)
      out0_gam <- sum(ga0_gam*(In_Trial_S==0))/nrow(Target_S)
      out0_gbdt <- sum(ga0_gbdt*(In_Trial_S==0))/nrow(Target_S)
      out0_SL <- sum(ga0_SL*(In_Trial_S==0))/nrow(Target_S)
@@ -516,8 +458,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
      out1_nnL1 <- sum(ga1_nnL1*(In_Trial==0))/nrow(Target)
      out1_nnL2 <- sum(ga1_nnL2*(In_Trial==0))/nrow(Target)
      out1_nnL3 <- sum(ga1_nnL3*(In_Trial==0))/nrow(Target)
-     out1_svmL <- sum(ga1_svmL*(In_Trial==0))/nrow(Target)
-     out1_svm <- sum(ga1_svm*(In_Trial==0))/nrow(Target)
      out1_gam <- sum(ga1_gam*(In_Trial==0))/nrow(Target)
      out1_gbdt <- sum(ga1_gbdt*(In_Trial==0))/nrow(Target)
      out1_SL <- sum(ga1_SL*(In_Trial==0))/nrow(Target)
@@ -527,8 +467,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
      out0_nnL1 <- sum(ga0_nnL1*(In_Trial==0))/nrow(Target)
      out0_nnL2 <- sum(ga0_nnL2*(In_Trial==0))/nrow(Target)
      out0_nnL3 <- sum(ga0_nnL3*(In_Trial==0))/nrow(Target)
-     out0_svmL <- sum(ga0_svmL*(In_Trial==0))/nrow(Target)
-     out0_svm <- sum(ga0_svm*(In_Trial==0))/nrow(Target)
      out0_gam <- sum(ga0_gam*(In_Trial==0))/nrow(Target)
      out0_gbdt <- sum(ga0_gbdt*(In_Trial==0))/nrow(Target)
      out0_SL <- sum(ga0_SL*(In_Trial==0))/nrow(Target)
@@ -546,10 +484,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
                        (Whole_S[ ,outname] - ga1_nnL2))/nrow(Target_S)
      DR1_nnL3 <- out1_nnL3 + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1_nnL3 * 
                        (Whole_S[ ,outname] - ga1_nnL3))/nrow(Target_S)
-     DR1_svmL <- out1_svmL + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1_svmL * 
-                       (Whole_S[ ,outname] - ga1_svmL))/nrow(Target_S)
-     DR1_svm <- out1_svm + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1_svm * 
-                       (Whole_S[ ,outname] - ga1_svm))/nrow(Target_S)
      DR1_gam <- out1_gam + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1_gam * 
                        (Whole_S[ ,outname] - ga1_gam))/nrow(Target_S)
      DR1_gbdt <- out1_gbdt + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==1) * wa1_gbdt * 
@@ -567,10 +501,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
                        (Whole_S[ ,outname] - ga0_nnL2))/nrow(Target_S)
      DR0_nnL3 <- out0_nnL3 + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==0) * wa0_nnL3 * 
                        (Whole_S[ ,outname] - ga0_nnL3))/nrow(Target_S)
-     DR0_svmL <- out0_svmL + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==0) * wa0_svmL * 
-                       (Whole_S[ ,outname] - ga0_svmL))/nrow(Target_S)
-     DR0_svm <- out0_svm + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==0) * wa0_svm * 
-                       (Whole_S[ ,outname] - ga0_svm))/nrow(Target_S)
      DR0_gam <- out0_gam + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==0) * wa0_gam * 
                        (Whole_S[ ,outname] - ga0_gam))/nrow(Target_S)
      DR0_gbdt <- out0_gbdt + sum((In_Trial_S==1) * (Whole_S[ ,trtname]==0) * wa0_gbdt * 
@@ -588,10 +518,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
                        (Whole[ ,outname] - ga1_nnL2))/nrow(Target)
      DR1_nnL3 <- out1_nnL3 + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_nnL3 * 
                        (Whole[ ,outname] - ga1_nnL3))/nrow(Target)
-     DR1_svmL <- out1_svmL + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_svmL * 
-                       (Whole[ ,outname] - ga1_svmL))/nrow(Target)
-     DR1_svm <- out1_svm + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_svm * 
-                       (Whole[ ,outname] - ga1_svm))/nrow(Target)
      DR1_gam <- out1_gam + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_gam * 
                        (Whole[ ,outname] - ga1_gam))/nrow(Target)
      DR1_gbdt <- out1_gbdt + sum((In_Trial==1) * (Whole[ ,trtname]==1) * wa1_gbdt * 
@@ -609,10 +535,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
                        (Whole[ ,outname] - ga0_nnL2))/nrow(Target)
      DR0_nnL3 <- out0_nnL3 + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_nnL3 * 
                        (Whole[ ,outname] - ga0_nnL3))/nrow(Target)
-     DR0_svmL <- out0_svmL + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_svmL * 
-                       (Whole[ ,outname] - ga0_svmL))/nrow(Target)
-     DR0_svm <- out0_svm + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_svm * 
-                       (Whole[ ,outname] - ga0_svm))/nrow(Target)
      DR0_gam <- out0_gam + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_gam * 
                        (Whole[ ,outname] - ga0_gam))/nrow(Target)
      DR0_gbdt <- out0_gbdt + sum((In_Trial==1) * (Whole[ ,trtname]==0) * wa0_gbdt * 
@@ -622,6 +544,6 @@ DR_Est <- function(Trial, Target, nu = 0.1, p = 5, Missing = FALSE,
   }
 
  return(c(DR1 - DR0, DR1_rf - DR0_rf, DR1_nnL1 - DR0_nnL1, DR1_nnL2 - DR0_nnL2, 
-          DR1_nnL3 - DR0_nnL3, DR1_svmL - DR0_svmL, DR1_svm - DR0_svm, 
-          DR1_gam - DR0_gam, DR1_gbdt - DR0_gbdt, DR1_SL - DR0_SL))
+          DR1_nnL3 - DR0_nnL3, DR1_gam - DR0_gam, DR1_gbdt - DR0_gbdt, 
+                  DR1_SL - DR0_SL))
 }
